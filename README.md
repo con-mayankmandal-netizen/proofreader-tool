@@ -66,6 +66,19 @@ cp .env.example .env   # fill in MONGODB_URI and ONE provider key
 npm start              # http://localhost:3000
 ```
 
+**Try it with zero setup (test mode)** — no MongoDB, no Atlas account:
+the app stores tasks and files in a local `.testdata/` folder instead.
+
+```bash
+npm install
+cp .env.example .env   # fill in ONLY your provider key (e.g. MISTRAL_API_KEY)
+npm run test-mode      # http://localhost:3000
+```
+
+Submit a task and watch it process; downloads work exactly like production.
+Delete `.testdata/` to reset. (Production always uses MongoDB — test mode
+never touches it.)
+
 Offline pipeline test (no key, no database; uses a stubbed model):
 `npm run smoke` — add `-- path/to/source.docx path/to/adapted.docx path/to/ls.xlsx`
 to run it on your own files.

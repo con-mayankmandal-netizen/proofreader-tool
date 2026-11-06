@@ -6,7 +6,7 @@ import express from "express";
 import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { connectDb, dbConfigured, saveFile, readFile, nextTaskId, tasks, episodesCol } from "./db.js";
+import { connectDb, dbConfigured, saveFile, readFile, nextTaskId, tasks, episodesCol, storageKind } from "./store.js";
 import { processTask } from "./process.js";
 import { callModel, providerConfig } from "./llm.js";
 
@@ -202,5 +202,5 @@ if (dbConfigured()) {
   for (const t of stuck) runTask(t.taskId).catch((e) => console.error("resume", t.taskId, e));
 }
 app.listen(port, () => {
-  console.log(`Proofreader Tool listening on :${port} (db: ${dbConfigured() ? "configured" : "NOT configured — set MONGODB_URI"})`);
+  console.log(`Proofreader Tool listening on :${port} (storage: ${storageKind})`);
 });

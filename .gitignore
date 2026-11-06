@@ -12,6 +12,7 @@ build/
 
 # Local data (tasks, uploads, outputs live in MongoDB / local dev folders)
 data/
+.testdata/
 uploads/
 outputs/
 *.log
