@@ -1,0 +1,22 @@
+# Secrets — never commit real keys
+.env
+*.env
+!.env.example
+
+# Dependencies / build
+node_modules/
+__pycache__/
+*.pyc
+dist/
+build/
+
+# Local data (tasks, uploads, outputs live in MongoDB / local dev folders)
+data/
+uploads/
+outputs/
+*.log
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
