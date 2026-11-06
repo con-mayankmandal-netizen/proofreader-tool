@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Proofreader Tool</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<header>
+  <h1>Proofreader Tool</h1>
+  <p class="sub">Line-by-line S + E proof-reading of adapted scripts against the source script and LS sheet.</p>
+  <p id="health" class="health"></p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Submit a task</h2>
+    <form id="submitForm">
+      <label>Show name
+        <input name="showName" required placeholder="e.g. My Vampire System"/>
+      </label>
+      <div class="row">
+        <label>Source script language
+          <select name="sourceLanguage" id="sourceLanguage" required></select>
+        </label>
+        <label>Adapted (non-proof-read) script language
+          <select name="adaptedLanguage" id="adaptedLanguage" required></select>
+        </label>
+      </div>
+      <div class="row">
+        <label>Source script (.docx)
+          <input type="file" name="sourceFile" accept=".docx" required/>
+        </label>
+        <label>Adapted script (.docx)
+          <input type="file" name="adaptedFile" accept=".docx" required/>
+        </label>
+        <label>LS sheet (.xlsx)
+          <input type="file" name="lsFile" accept=".xlsx,.xls" required/>
+        </label>
+      </div>
+      <button type="submit" id="submitBtn">Submit task</button>
+      <p id="submitMsg" class="msg"></p>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Tasks</h2>
+    <table id="tasksTable">
+      <thead>
+        <tr><th>Task ID</th><th>Show</th><th>Languages</th><th>Status</th><th>Result</th><th>Downloads</th><th></th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="noTasks" class="msg">No tasks yet.</p>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Render blueprint — one web service. Set the secret env vars in the
+# Render dashboard (never in this file, never in git).
+services:
+  - type: web
+    name: proofreader-tool
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: proofreader
+      - key: MODEL_PROVIDER
+        value: mistral
+      - key: MISTRAL_API_KEY
+        sync: false
+      - key: MISTRAL_MODEL
+        value: mistral-large-latest
+      - key: CLAUDE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

@@ -49,6 +49,52 @@ Rules that apply to all three: one model of record per task (never mix mid-show 
 name/variant judgements must stay consistent across episodes), temperature 0, and every
 response passes the validation layer in `PROMPT_PACK.md` §5 before anything is stored.
 
+## The standalone app (in this repo)
+
+A working web version lives here: submit form (show, both languages, the three
+files) → Task ID → background processing → per-task downloads of the 3 input
+originals and, once Ready, the 3 outputs. Processing follows SPEC.md exactly:
+blocks of 5 episodes, one API call per episode, the §5 validation layer with
+up to 3 attempts per episode, a deterministic pass 2 over the clean lines
+(source-language name leaks), and outputs built only from validated results.
+
+**Run locally**
+
+```bash
+npm install
+cp .env.example .env   # fill in MONGODB_URI and ONE provider key
+npm start              # http://localhost:3000
+```
+
+Offline pipeline test (no key, no database; uses a stubbed model):
+`npm run smoke` — add `-- path/to/source.docx path/to/adapted.docx path/to/ls.xlsx`
+to run it on your own files.
+
+**Deploy (Render + MongoDB Atlas, both have free tiers)**
+
+1. MongoDB Atlas → create a free cluster → Database Access: add a user →
+   Network Access: allow `0.0.0.0/0` → Connect: copy the connection string
+   into `MONGODB_URI` (include the database name, e.g. `...mongodb.net/proofreader`).
+2. Render → New → Blueprint → pick this repo (render.yaml is included), or
+   New Web Service with build `npm install`, start `npm start`.
+3. Set the env vars in the Render dashboard: `MONGODB_URI`, `MODEL_PROVIDER`
+   (`mistral`, `claude` or `gemini`) and that provider's key. Keys are read
+   server-side only and are never committed — `.env` is git-ignored.
+
+**Known v1 limits (honest list)**
+
+- No login/auth yet — anyone with the URL can submit and download. Put it
+  behind the host's access control, or add auth before sharing the link widely.
+- Output documents are rebuilt with the same paragraph styles (headings stay
+  headings); run-level formatting inside a line (bold/italics on single words)
+  is flattened.
+- Language profiles exist for Turkish and Polish (the two proven pilots);
+  other languages run on the general rules until a profile is written (§6 of
+  the prompt pack explains how).
+- Pass 2's second-model re-read is wired as an option (VERIFICATION_PROVIDER)
+  but the deterministic checks always run; the name-leak flags are always
+  "Flagged only" for a human to confirm.
+
 ## Storage
 
 MongoDB. Tasks hold metadata/status; uploaded originals and generated outputs are

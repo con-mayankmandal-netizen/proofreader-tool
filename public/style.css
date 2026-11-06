@@ -1,0 +1,28 @@
+:root { --bg:#0f1420; --card:#1a2233; --line:#2b3852; --text:#e8edf7; --muted:#9db0cc; --accent:#4f8cff; --red:#ff6b6b; --yellow:#ffd93d; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); }
+header { padding: 28px 24px 4px; max-width: 1180px; margin: 0 auto; }
+h1 { margin: 0 0 4px; font-size: 26px; }
+.sub { color: var(--muted); margin: 0 0 4px; }
+.health { color: var(--yellow); font-size: 13px; min-height: 16px; }
+main { max-width: 1180px; margin: 0 auto; padding: 12px 24px 40px; display: grid; gap: 18px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.card h2 { margin: 0 0 14px; font-size: 18px; }
+form { display: grid; gap: 12px; }
+label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+input, select { background: #101828; border: 1px solid var(--line); border-radius: 8px; color: var(--text); padding: 9px 10px; font-size: 14px; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 10px 16px; font-size: 14px; cursor: pointer; justify-self: start; }
+button:disabled { opacity: .5; cursor: default; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+.status { padding: 2px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
+.s-ready { color: #7be495; } .s-processing { color: var(--yellow); } .s-failed { color: var(--red); } .s-submitted { color: var(--muted); }
+.dls { display: grid; gap: 4px; }
+.dlgroup { color: var(--muted); }
+a.dl { color: var(--accent); text-decoration: none; margin-right: 8px; white-space: nowrap; }
+a.dl:hover { text-decoration: underline; }
+.msg { color: var(--muted); font-size: 13.5px; }
+.err { color: var(--red); }
+td button { padding: 5px 10px; font-size: 12.5px; background: #24304d; }
