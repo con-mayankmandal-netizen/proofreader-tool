@@ -18,7 +18,7 @@ table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; }
 .status { padding: 2px 8px; border-radius: 99px; font-size: 12px; border: 1px solid var(--line); }
-.s-ready { color: #7be495; } .s-processing { color: var(--yellow); } .s-failed { color: var(--red); } .s-submitted { color: var(--muted); }
+.s-ready { color: #7be495; } .s-processing { color: var(--yellow); } .s-failed { color: var(--red); } .s-submitted { color: var(--muted); } .s-partial { color: #f0a35e; }
 .dls { display: grid; gap: 4px; }
 .dlgroup { color: var(--muted); }
 a.dl { color: var(--accent); text-decoration: none; margin-right: 8px; white-space: nowrap; }

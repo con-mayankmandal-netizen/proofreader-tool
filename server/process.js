@@ -103,11 +103,14 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
   }
   const n = Math.min(adaptedEps.length, sourceEps.length);
   const episodeResults = [];
+  let abortedReason = null;
+  let stop = false;
 
-  for (let blockStart = 0; blockStart < n; blockStart += BLOCK_SIZE) {
+  for (let blockStart = 0; blockStart < n && !stop; blockStart += BLOCK_SIZE) {
     const block = [];
     for (let i = blockStart; i < Math.min(blockStart + BLOCK_SIZE, n); i++) block.push(i);
     for (const idx of block) {
+      if (stop) break;
       const aEp = adaptedEps[idx];
       const sEp = sourceEps[idx];
       const lines = episodeLines(aEp);
@@ -141,9 +144,21 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
       });
       let result = null;
       let lastErrors = [];
+      let apiError = null;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         const user = attempt === 1 ? baseUser : baseUser + retrySuffix(lastErrors);
-        const raw = await callLLM(system, user);
+        let raw;
+        try {
+          raw = await callLLM(system, user);
+        } catch (e) {
+          // A model API failure (quota, outage, auth) is not a validation
+          // problem: retrying the episode cannot fix it, and burning further
+          // episodes into it wastes quota. Fail this episode, stop the run,
+          // and let the caller salvage documents from completed episodes.
+          apiError = String(e.message || e);
+          lastErrors = [`Model API error: ${apiError}`];
+          break;
+        }
         let parsed;
         try {
           parsed = extractJson(raw);
@@ -165,7 +180,11 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
         lastErrors = v.errors;
       }
       if (!result) {
-        episodeResults.push({ epNo: aEp.epNo, status: "failed", errors: lastErrors, totals: null, fixes: [], coverage: [] });
+        episodeResults.push({ epNo: aEp.epNo, status: "failed", errors: lastErrors, totals: null, fixes: [], coverage: [], ...(apiError ? { apiError } : {}) });
+        if (apiError) {
+          abortedReason = apiError;
+          stop = true;
+        }
       } else {
         pass2NameLeaks(result, lines, entities);
         episodeResults.push(result);
@@ -174,17 +193,44 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
     }
   }
 
+  // Episodes never attempted (the run stopped early) get placeholders, so
+  // every consumer can rely on exactly one result per episode, in order.
+  for (let idx = episodeResults.length; idx < n; idx++) {
+    episodeResults.push({ epNo: adaptedEps[idx].epNo, status: "not-run", errors: [], totals: null, fixes: [], coverage: [] });
+  }
+  if (abortedReason) {
+    warnings.push(
+      `Processing stopped early: the model API failed (${abortedReason}). Episodes not yet attempted were skipped; any documents cover only the completed episodes.`
+    );
+  }
+
   const failed = episodeResults.filter((e) => e.status === "failed");
+  const notRun = episodeResults.filter((e) => e.status === "not-run");
+  const completed = episodeResults.filter((e) => e.status === "ok");
+  const isPartial = (failed.length > 0 || notRun.length > 0) && completed.length > 0;
+  if (isPartial) {
+    warnings.push(
+      `PARTIAL DOCUMENTS: built from the ${completed.length} completed episode(s) (${completed.map((e) => e.epNo).join(", ")}). ` +
+      `Episode(s) ${[...failed, ...notRun].map((e) => e.epNo).join(", ")} are NOT proofread — they appear in the documents exactly as submitted.`
+    );
+  }
   const summary = {
-    episodesProcessed: episodeResults.length,
+    episodesProcessed: completed.length + failed.length,
     episodesFailed: failed.map((e) => e.epNo),
+    episodesNotRun: notRun.map((e) => e.epNo),
+    outputsForEpisodes: completed.map((e) => e.epNo),
+    partial: isPartial,
+    abortedReason: abortedReason || null,
     totalFixes: episodeResults.reduce((a, e) => a + (e.fixes?.length || 0), 0),
     droppedOutOfScope: episodeResults.reduce((a, e) => a + (e.droppedOutOfScope || 0), 0),
     pass2Finds: episodeResults.reduce((a, e) => a + (e.pass2Finds || 0), 0),
     warnings,
     promptVersion: PROMPT_VERSION,
   };
-  if (failed.length) return { episodeResults, summary, outputs: null };
+  // No completed episode -> no documents at all (the old all-or-nothing case).
+  // Otherwise the documents are built from the completed episodes only;
+  // unfinished episodes contribute their original text and no fixes.
+  if (!completed.length) return { episodeResults, summary, outputs: null };
 
   // Assemble the document model for the output builders.
   const linesByPara = new Map();

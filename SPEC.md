@@ -50,6 +50,13 @@ Every task offers downloads of **both sides**:
   One exception (owner decision, 2026-11-06): a fix row whose sub-type is a
   punctuation label is out of scope, so the validator DROPS it (never applied,
   counted in the task summary's warnings) instead of failing the episode for it.
+- **Partial documents** (owner request, 2026-11-06): if a run stops partway —
+  some episodes failed validation, or the model API died (e.g. quota) — the
+  documents are still built from the COMPLETED episodes and the task is marked
+  `Partial` with the missing episodes named. Unfinished episodes appear in the
+  documents exactly as submitted (never silently proofread). Only a run with
+  zero completed episodes produces no documents. A model API error stops the
+  run immediately instead of burning further episodes into a dead quota.
 - **Pass 2 — recall sweep (mandatory).** The first pass's "clean" lines are re-checked:
   1. deterministic pattern checks per language profile (source-language name leaks,
      number/stat mismatches, untranslated fragments — punctuation patterns excluded,

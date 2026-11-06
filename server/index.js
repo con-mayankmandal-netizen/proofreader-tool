@@ -89,9 +89,12 @@ async function runTask(taskId) {
       );
     }
     if (!result.outputs) {
+      const errText = result.summary.abortedReason
+        ? `Model API error: ${result.summary.abortedReason}`
+        : `Episodes failed validation: ${result.summary.episodesFailed.join(", ")}`;
       await col.updateOne(
         { taskId },
-        { $set: { status: "Failed", summary: result.summary, error: `Episodes failed validation: ${result.summary.episodesFailed.join(", ")}`, updatedAt: new Date() } }
+        { $set: { status: "Failed", summary: result.summary, error: errText, reviewFileId: null, correctedFileId: null, changelogFileId: null, updatedAt: new Date() } }
       );
       return;
     }
@@ -101,9 +104,23 @@ async function runTask(taskId) {
       saveFile(result.outputs.corrected, { filename: `${safe} - Corrected.docx`, contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", metadata: { taskId, kind: "corrected" } }),
       saveFile(result.outputs.log, { filename: `${safe} - Change log.xlsx`, contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", metadata: { taskId, kind: "changelog" } }),
     ]);
+    if (result.summary.partial) {
+      const missing = [
+        ...result.summary.episodesFailed.map((e) => `episode ${e} (failed)`),
+        ...result.summary.episodesNotRun.map((e) => `episode ${e} (not attempted)`),
+      ].join("; ");
+      const errText =
+        `Partial documents: built from completed episode(s) ${result.summary.outputsForEpisodes.join(", ")}. Missing: ${missing}.` +
+        (result.summary.abortedReason ? ` Stopped early — model API: ${result.summary.abortedReason}` : "");
+      await col.updateOne(
+        { taskId },
+        { $set: { status: "Partial", summary: result.summary, error: errText, reviewFileId, correctedFileId, changelogFileId, updatedAt: new Date() } }
+      );
+      return;
+    }
     await col.updateOne(
       { taskId },
-      { $set: { status: "Ready", summary: result.summary, reviewFileId, correctedFileId, changelogFileId, updatedAt: new Date() } }
+      { $set: { status: "Ready", summary: result.summary, error: null, reviewFileId, correctedFileId, changelogFileId, updatedAt: new Date() } }
     );
   } catch (e) {
     await col.updateOne({ taskId }, { $set: { status: "Failed", error: String(e.message || e), updatedAt: new Date() } });

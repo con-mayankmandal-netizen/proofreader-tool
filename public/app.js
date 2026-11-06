@@ -37,12 +37,14 @@ function renderTasks(tasks) {
     let result = "";
     if (t.status === "Ready" && t.summary) {
       result = `${t.summary.totalFixes} fixes · ${t.summary.pass2Finds} pass-2 finds`;
+    } else if (t.status === "Partial" && t.summary) {
+      result = `${t.summary.totalFixes} fixes · partial — episodes ${(t.summary.outputsForEpisodes || []).join(", ")} only<br><span class="err">${t.error || ""}</span>`;
     } else if (t.status === "Processing" && t.progress) {
       result = `Episode ${t.progress.done} of ${t.progress.total}`;
     } else if (t.status === "Failed" && t.error) {
       result = `<span class="err">${t.error}</span>`;
     }
-    const reprocess = (t.status === "Failed" || t.status === "Ready")
+    const reprocess = (t.status === "Failed" || t.status === "Ready" || t.status === "Partial")
       ? `<button data-reprocess="${t.taskId}">Reprocess</button>` : "";
     return `<tr>
       <td><strong>${t.taskId}</strong></td>

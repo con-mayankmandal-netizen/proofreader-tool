@@ -268,6 +268,14 @@ that returns such a row anyway has produced a row the tool would never use; fail
 episode over it (the old behaviour) cost real runs. All other checks stay strict — in
 particular check 4 (byte-exact `before`) still fails the episode.
 
+**Partial documents (owner request, 2026-11-06):** validation stays all-or-nothing *per
+episode*, but a task is no longer all-or-nothing. If some episodes complete and others
+fail (validation) or are never attempted (the model API died mid-run — an API error stops
+the run at once rather than burning quota on retries), the three documents are built from
+the completed episodes only, the task is marked `Partial`, and the summary names exactly
+which episodes the documents cover and which they do not. Unfinished episodes appear in
+the documents verbatim, with no fixes — partiality is always visible, never silent.
+
 Retry prompt suffix (append to the user message on attempts 2–3):
 
 ```
