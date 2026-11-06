@@ -39,19 +39,70 @@ export function verificationConfig() {
   return { provider, key, model };
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Rate-limit handling (the standing rule for this tool: slow is fine,
+// correct matters). A 429 or 5xx no longer fails the task on the spot: the
+// same request is retried with growing waits, honouring Retry-After when
+// the provider sends one. Only after all retries is the error thrown, in
+// the same "Model API <status>: ..." shape as before.
+const MAX_API_RETRIES = 5;
+
+function retryDelayMs(res, attempt) {
+  const ra = res?.headers?.get?.("retry-after");
+  if (ra) {
+    const secs = Number(ra);
+    if (Number.isFinite(secs) && secs > 0) return Math.min(secs * 1000, 300000);
+    const when = Date.parse(ra);
+    if (Number.isFinite(when)) return Math.min(Math.max(when - Date.now(), 5000), 300000);
+  }
+  return Math.min(20000 * 2 ** attempt, 180000);
+}
+
 async function postJson(url, headers, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`Model API ${res.status}: ${text.slice(0, 400)}`);
-  return JSON.parse(text);
+  for (let attempt = 0; attempt <= MAX_API_RETRIES; attempt++) {
+    let res;
+    try {
+      res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      if (attempt === MAX_API_RETRIES) throw e;
+      const wait = Math.min(20000 * 2 ** attempt, 180000);
+      console.log(`Model API network error (${e.message}); retrying in ${Math.round(wait / 1000)}s`);
+      await sleep(wait);
+      continue;
+    }
+    const text = await res.text();
+    if (res.ok) return JSON.parse(text);
+    const err = new Error(`Model API ${res.status}: ${text.slice(0, 400)}`);
+    const retryable = res.status === 429 || res.status >= 500;
+    if (!retryable || attempt === MAX_API_RETRIES) throw err;
+    const wait = retryDelayMs(res, attempt);
+    console.log(`Model API ${res.status} (rate limited or server error); retrying in ${Math.round(wait / 1000)}s`);
+    await sleep(wait);
+  }
+  throw new Error("Model API request failed");
+}
+
+// Pacing: keep a minimum gap between model calls (default 8s, override with
+// MODEL_MIN_INTERVAL_MS) so a block of episodes does not burst through a
+// tier's per-minute rate limit.
+const MIN_INTERVAL_MS = Math.max(0, Number(process.env.MODEL_MIN_INTERVAL_MS || 8000) || 0);
+let nextCallSlot = 0;
+async function paceModelCall() {
+  if (!MIN_INTERVAL_MS) return;
+  const now = Date.now();
+  const wait = Math.max(0, nextCallSlot - now);
+  nextCallSlot = Math.max(now, nextCallSlot) + MIN_INTERVAL_MS;
+  if (wait) await sleep(wait);
 }
 
 export async function callModel({ provider, key, model }, system, user) {
   if (!key) throw new Error(`No API key configured for provider "${provider}"`);
+  await paceModelCall();
   if (provider === "mistral") {
     const data = await postJson(
       "https://api.mistral.ai/v1/chat/completions",
