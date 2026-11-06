@@ -259,6 +259,15 @@ what makes the system foolproof: the prompt asks, the validator enforces.
    reproduce the corrected document exactly — build the corrected doc from the validated JSON,
    never from a second model output.
 
+**Out-of-scope drop (owner decision, 2026-11-06):** before checks 2–8 run, any fix row whose
+sub-type is a punctuation label (`Punctuation`, comma/quote/dash labels, …) is DROPPED — never
+applied, never stored — and the episode does NOT fail for it; a line whose only rows were
+dropped counts as `clean` in coverage. The drop count and sub-types are recorded in the task
+summary's warnings. Rationale: punctuation is out of scope by product decision, so a model
+that returns such a row anyway has produced a row the tool would never use; failing a whole
+episode over it (the old behaviour) cost real runs. All other checks stay strict — in
+particular check 4 (byte-exact `before`) still fails the episode.
+
 Retry prompt suffix (append to the user message on attempts 2–3):
 
 ```

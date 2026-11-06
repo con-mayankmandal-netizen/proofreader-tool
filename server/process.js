@@ -153,7 +153,13 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
         }
         const v = validateEpisodeResult(parsed, { lines, adaptedLanguage: meta.adaptedLanguage, epNo: aEp.epNo });
         if (v.ok) {
-          result = { epNo: aEp.epNo, coverage: parsed.coverage, fixes: parsed.fixes, totals: v.totals, status: "ok", attempts: attempt, pass2Finds: 0 };
+          result = { epNo: aEp.epNo, coverage: v.coverage, fixes: v.fixes, totals: v.totals, status: "ok", attempts: attempt, pass2Finds: 0, droppedOutOfScope: v.dropped.length };
+          if (v.dropped.length) {
+            const kinds = [...new Set(v.dropped.map((d) => `"${d.subtype}"`))].join(", ");
+            warnings.push(
+              `Episode ${aEp.epNo}: dropped ${v.dropped.length} out-of-scope fix(es) (${kinds}) — punctuation is out of scope, so these were discarded instead of failing the episode. They were not applied.`
+            );
+          }
           break;
         }
         lastErrors = v.errors;
@@ -173,6 +179,7 @@ export async function processTask(meta, files, callLLM, onProgress = () => {}) {
     episodesProcessed: episodeResults.length,
     episodesFailed: failed.map((e) => e.epNo),
     totalFixes: episodeResults.reduce((a, e) => a + (e.fixes?.length || 0), 0),
+    droppedOutOfScope: episodeResults.reduce((a, e) => a + (e.droppedOutOfScope || 0), 0),
     pass2Finds: episodeResults.reduce((a, e) => a + (e.pass2Finds || 0), 0),
     warnings,
     promptVersion: PROMPT_VERSION,

@@ -47,6 +47,9 @@ Every task offers downloads of **both sides**:
 - Every response passes the validation layer (`PROMPT_PACK.md` §5) — byte-exact
   before-texts, full line coverage, allowed sub-types, confidence/status pairing.
   Failure → retry with the error list (max 3) → episode marked failed for a human.
+  One exception (owner decision, 2026-11-06): a fix row whose sub-type is a
+  punctuation label is out of scope, so the validator DROPS it (never applied,
+  counted in the task summary's warnings) instead of failing the episode for it.
 - **Pass 2 — recall sweep (mandatory).** The first pass's "clean" lines are re-checked:
   1. deterministic pattern checks per language profile (source-language name leaks,
      number/stat mismatches, untranslated fragments — punctuation patterns excluded,

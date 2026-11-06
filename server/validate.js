@@ -9,16 +9,62 @@ const STATUS_FOR_CONFIDENCE = {
   Low: "Flagged only",
 };
 
+// Out of scope — punctuation (product decision 2026-11-06): punctuation fixes
+// are never proofread by this tool. A model that returns one anyway must not
+// fail the whole episode for it (owner instruction 2026-11-06): the row is
+// DROPPED before the strict checks run, never applied, and the drop is
+// reported back so the caller can surface it in the task summary. Only the
+// sub-type decides — a punctuation label is out of scope whatever category
+// the model put it in. Everything else stays strict (byte-exact before etc.).
+const PUNCT_SUBTYPE_EXACT = new Set([
+  "comma", "commas", "comma use", "quotation marks", "quote style",
+  "apostrophe", "apostrophes", "dash", "dashes", "hyphen", "hyphens",
+  "period", "periods", "full stop", "full stops", "question marks",
+  "exclamation marks", "colon", "colons", "semicolon", "semicolons",
+  "brackets", "ellipsis",
+]);
+
+export function isOutOfScopeFix(f) {
+  if (!f || typeof f.subtype !== "string") return false;
+  const st = f.subtype.trim();
+  return /punct/i.test(st) || PUNCT_SUBTYPE_EXACT.has(st.toLowerCase());
+}
+
 export function validateEpisodeResult(result, { lines, adaptedLanguage, epNo }) {
   const errors = [];
-  if (!result || typeof result !== "object") return { ok: false, errors: ["output is not a JSON object"], totals: null };
+  if (!result || typeof result !== "object") return { ok: false, errors: ["output is not a JSON object"], totals: null, dropped: [] };
   const keys = Object.keys(result).sort();
   if (keys.join(",") !== "coverage,fixes") {
     errors.push(`top-level keys must be exactly "coverage" and "fixes" (got: ${keys.join(", ") || "none"})`);
-    return { ok: false, errors, totals: null };
+    return { ok: false, errors, totals: null, dropped: [] };
   }
   const { coverage, fixes } = result;
   const lineById = new Map(lines.map((l) => [l.line_id, l]));
+
+  if (!Array.isArray(fixes)) {
+    errors.push("fixes must be an array");
+    return { ok: false, errors, totals: null, dropped: [] };
+  }
+
+  // Out-of-scope drop: remove punctuation fix rows BEFORE the strict checks.
+  // A line whose only fix rows were dropped falls back to "clean" in
+  // coverage; ADD rows are never dropped (their sub-type is fixed by the
+  // contract and is never a punctuation label).
+  const dropped = [];
+  const keptFixes = [];
+  for (const f of fixes) {
+    if (f && !/-ADD-\d+$/.test(f.id || "") && isOutOfScopeFix(f)) {
+      dropped.push({ id: f.id || "(missing id)", subtype: f.subtype });
+    } else {
+      keptFixes.push(f);
+    }
+  }
+  if (dropped.length && Array.isArray(coverage)) {
+    const keptIds = new Set(keptFixes.map((f) => f.id));
+    for (const c of coverage) {
+      if ((c.status === "fix" || c.status === "flag") && !keptIds.has(c.line_id)) c.status = "clean";
+    }
+  }
 
   // Check 2: coverage shape
   if (!Array.isArray(coverage) || coverage.length !== lines.length) {
@@ -35,17 +81,12 @@ export function validateEpisodeResult(result, { lines, adaptedLanguage, epNo }) 
   }
   const covStatus = new Map((Array.isArray(coverage) ? coverage : []).map((c) => [c.line_id, c.status]));
 
-  if (!Array.isArray(fixes)) {
-    errors.push("fixes must be an array");
-    return { ok: false, errors, totals: null };
-  }
-
   const allowedS = new Set(S_SUBTYPES);
   const allowedE = new Set(eSubtypes(adaptedLanguage));
   const seenIds = new Set();
   let addSeq = 0;
 
-  for (const f of fixes) {
+  for (const f of keptFixes) {
     const id = f.id || "(missing id)";
     if (seenIds.has(id)) errors.push(`duplicate fix row for ${id}`);
     seenIds.add(id);
@@ -100,20 +141,20 @@ export function validateEpisodeResult(result, { lines, adaptedLanguage, epNo }) 
     }
   }
 
-  if (errors.length) return { ok: false, errors, totals: null };
+  if (errors.length) return { ok: false, errors, totals: null, dropped };
 
-  // Check 7: totals
+  // Check 7: totals (kept fixes only — dropped rows never happened)
   const totals = {
     linesChecked: lines.length,
     clean: coverage.filter((c) => c.status === "clean").length,
-    fixesS: fixes.filter((f) => f.category === "S").length,
-    fixesE: fixes.filter((f) => f.category === "E").length,
-    applied: fixes.filter((f) => f.status === "Applied").length,
-    appliedFlagged: fixes.filter((f) => f.status === "Applied (flagged)").length,
-    flaggedOnly: fixes.filter((f) => f.status === "Flagged only").length,
-    addRows: fixes.filter((f) => /-ADD-\d+$/.test(f.id)).length,
+    fixesS: keptFixes.filter((f) => f.category === "S").length,
+    fixesE: keptFixes.filter((f) => f.category === "E").length,
+    applied: keptFixes.filter((f) => f.status === "Applied").length,
+    appliedFlagged: keptFixes.filter((f) => f.status === "Applied (flagged)").length,
+    flaggedOnly: keptFixes.filter((f) => f.status === "Flagged only").length,
+    addRows: keptFixes.filter((f) => /-ADD-\d+$/.test(f.id)).length,
   };
-  return { ok: true, errors: [], totals };
+  return { ok: true, errors: [], totals, fixes: keptFixes, coverage, dropped };
 }
 
 // Apply the validated fixes to the episode's lines (check 8 helper):
