@@ -10,6 +10,11 @@ import { connectDb, dbConfigured, saveFile, readFile, nextTaskId, tasks, episode
 import { processTask } from "./process.js";
 import { callModel, providerConfig } from "./llm.js";
 
+// Crash guards: a stray async rejection (e.g. from the database driver's
+// internal timers) must be logged, never allowed to kill the web process.
+process.on("unhandledRejection", (e) => console.error("unhandledRejection (logged, process kept alive):", e?.message || e));
+process.on("uncaughtException", (e) => console.error("uncaughtException (logged, process kept alive):", e?.message || e));
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 60 * 1024 * 1024 } });
@@ -196,10 +201,14 @@ app.get("/api/tasks/:id/files/:kind", async (req, res) => {
 
 const port = process.env.PORT || 3000;
 if (dbConfigured()) {
-  await connectDb();
-  // Resume anything left mid-processing by a restart.
-  const stuck = await tasks().find({ status: "Processing" }).toArray();
-  for (const t of stuck) runTask(t.taskId).catch((e) => console.error("resume", t.taskId, e));
+  try {
+    await connectDb();
+    // Resume anything left mid-processing by a restart.
+    const stuck = await tasks().find({ status: "Processing" }).toArray();
+    for (const t of stuck) runTask(t.taskId).catch((e) => console.error("resume", t.taskId, e));
+  } catch (e) {
+    console.error(`DB connect failed: ${e.message} — starting WITHOUT the database. Check MONGODB_URI (address, username, password, network access) and redeploy.`);
+  }
 }
 app.listen(port, () => {
   console.log(`Proofreader Tool listening on :${port} (storage: ${storageKind})`);

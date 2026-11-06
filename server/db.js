@@ -12,8 +12,16 @@ export function dbConfigured() {
 
 export async function connectDb() {
   if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI is not set");
-  client = new MongoClient(process.env.MONGODB_URI);
-  await client.connect();
+  client = new MongoClient(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+    connectTimeoutMS: 10000,
+  });
+  try {
+    await client.connect();
+  } catch (e) {
+    client = null;
+    throw e;
+  }
   db = client.db(process.env.MONGODB_DB || undefined);
   bucket = new GridFSBucket(db, { bucketName: "files" });
   return db;
